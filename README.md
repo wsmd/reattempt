@@ -29,14 +29,12 @@ reattempt
 - [Usage](#usage)
   - [Asynchronous Promise-Based Functions](#asynchronous-promise-based-functions)
   - [Node.js Error-First Callbacks](#nodejs-error-first-callbacks)
-  - [Lazily Evaluated Functions](#lazily-evaluated-functions)
   - [Working with TypeScript](#working-with-typescript)
     - [Reattempt As A Decorator](#reattempt-as-a-decorator)
     - [Type Safe Callbacks](#type-safe-callbacks)
 - [API](#api)
   - [Methods](#methods)
     - [`run(options: Options, callback: Callback): Promise`](#runoptions-options-callback-callback-promise)
-    - [`lazy(options: Options, callback: Callback): () => Promise`](#lazyoptions-options-callback-callback---promise)
   - [Reattempt Options](#reattempt-options)
     - [`times: number`](#times-number)
     - [`delay?: number`](#delay-number)
@@ -99,25 +97,6 @@ async function main() {
 }
 ```
 
-### Lazily Evaluated Functions
-
-You can execute at a function that reattempts at a later time by using `Reattempt.lazy`.
-
-`Reattempt.lazy` is a higher order function that takes in a function to be reattempted, and returns a new function decorated with the Reattempt logic.
-
-```js
-import Reattempt from 'reattempt';
-
-const getUserIds = Reattempt.lazy({ times: 3 }, async () => {
-  const user = await flakyAPI.getUsers(); // could throw!
-  return users.map(user => user.id);
-});
-
-// the newly created function will perform reattempts when necessary
-getUserIds()
-  .then(data => /* ... */)
-  .catch(error => /* ... */)
-```
 
 ### Working with TypeScript
 
@@ -168,11 +147,6 @@ Runs and reattempt the provided callback. If the callback fails, it will be reat
 
 Returns a `Promise` that resolves with the result of the provided function, and rejects with the same error it could reject with.
 
-#### `lazy(options: Options, callback: Callback): () => Promise`
-
-Returns a new function that wraps to the provided one with the Reattempt logic.
-
-The newly returned function returns a `Promise` that resolves with the result of the provided function and rejects with the same error it could reject with.
 
 ### Reattempt Options
 

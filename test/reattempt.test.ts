@@ -7,7 +7,6 @@ afterEach(() => {
 describe('Reattempt', () => {
   test('Reattempt has correct methods', () => {
     expect(Reattempt).toHaveProperty('run', expect.any(Function));
-    expect(Reattempt).toHaveProperty('lazy', expect.any(Function));
   });
 
   test('Reattempt.run() returns a promise', () => {
@@ -89,19 +88,5 @@ describe('Reattempt', () => {
     const promise = Reattempt.run({ times: 2 }, resolve => fn(resolve));
     await expect(promise).resolves.toBe('pass');
     expect(fn).toHaveBeenCalledTimes(1);
-  });
-
-  test('Reattempt.lazy() returns a function that resolves', async () => {
-    const fn = Reattempt.lazy({ times: 2 }, () => Promise.resolve('pass'));
-    expect(fn).toBeInstanceOf(Function);
-    await expect(fn()).resolves.toBe('pass');
-  });
-
-  test('Reattempt.lazy() returns a function that rejects', async () => {
-    const impl = jest.fn(() => Promise.reject('error'));
-    const fn = Reattempt.lazy({ times: 2 }, impl);
-    expect(fn).toBeInstanceOf(Function);
-    await expect(fn()).rejects.toBe('error');
-    expect(impl).toHaveBeenCalledTimes(2);
   });
 });

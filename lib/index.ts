@@ -98,15 +98,6 @@ function reattemptFunction<V>(
     }
   });
 }
-
-function createReattemptFunction<V>(
-  options: ReattemptOptions,
-  callback: AsyncAttemptFunction<V> | CallbackAttemptFunction<V>,
-): () => CallbackPromise<typeof callback> {
-  return reattemptFunction.bind(null, options, callback) as any;
-}
-
 export default {
-  lazy: createReattemptFunction,
   run: reattemptFunction,
 };
