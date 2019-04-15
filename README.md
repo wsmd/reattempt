@@ -101,7 +101,7 @@ async function main() {
 
 ### Custom Interface Functions
 
-Similar to working with *[Node.js Error-First Callbacks](nodejs-error-first-callbacks)*, the `done` callback can be used to reattempt any asynchronous function with custom callback interface. For example, some APIs expects an `onSuccess` and `onError` callbacks.
+Similar to working with *[Node.js Error-First Callbacks](#nodejs-error-first-callbacks)*, the `done` callback can be used to reattempt any asynchronous function with custom callback interface. For example, some APIs expects an `onSuccess` and `onError` callbacks.
 
 The properties `done.resolve` and `done.reject` can be used to hook into any custom interface and perform reattempts as needed.
 
@@ -229,7 +229,7 @@ If you are reattempting a non-`async` function (or a function that does not retu
 This argument controls the reattempt flow and can be used in one of two ways:
 
 - As an error-first callback that you can pass to any function such as most Node.js APIs
-- A hook to custom interfaces that excepts success and error callbacks by utilizing the two properties `done.resolve` and `done.reject`.
+- As a hook to custom interfaces that expects success and error callbacks by utilizing the two properties `done.resolve` and `done.reject`.
 
 # License
 

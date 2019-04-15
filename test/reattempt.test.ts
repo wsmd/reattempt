@@ -76,7 +76,9 @@ describe('Reattempt', () => {
     const fn = jest.fn(callback => {
       process.nextTick(() => callback(null, 'pass'));
     });
-    const promise = Reattempt.run({ times: 2 }, resolve => fn(resolve));
+    const promise = Reattempt.run<[string]>({ times: 2 }, resolve =>
+      fn(resolve),
+    );
     await expect(promise).resolves.toEqual(['pass']);
     expect(fn).toHaveBeenCalledTimes(1);
   });
@@ -85,7 +87,9 @@ describe('Reattempt', () => {
     const fn = jest.fn(callback => {
       process.nextTick(() => callback('error'));
     });
-    const promise = Reattempt.run({ times: 2 }, resolve => fn(resolve));
+    const promise = Reattempt.run<[string]>({ times: 2 }, resolve =>
+      fn(resolve),
+    );
     await expect(promise).rejects.toBe('error');
     expect(fn).toHaveBeenCalledTimes(2);
   });
@@ -95,7 +99,7 @@ describe('Reattempt', () => {
     const fn = jest.fn((onSuccess, onError) => {
       process.nextTick(() => (passes-- ? onError('error') : onSuccess('pass')));
     });
-    const promise = Reattempt.run({ times: 4 }, done => {
+    const promise = Reattempt.run<[string]>({ times: 4 }, done => {
       fn(done.resolve, done.reject);
     });
     await expect(promise).resolves.toEqual(['pass']);
@@ -106,7 +110,7 @@ describe('Reattempt', () => {
     const fn = jest.fn((onSuccess, onError) => {
       process.nextTick(() => (passes-- ? onError('error') : onSuccess('pass')));
     });
-    const promise = Reattempt.run({ times: 2 }, done => {
+    const promise = Reattempt.run<[string]>({ times: 2 }, done => {
       fn(done.resolve, done.reject);
     });
     await expect(promise).rejects.toBe('error');
