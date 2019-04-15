@@ -72,21 +72,43 @@ describe('Reattempt', () => {
     promise.catch(() => {});
   });
 
+  test('Reattempt.run() resolves error first callbacks', async () => {
+    const fn = jest.fn(callback => {
+      process.nextTick(() => callback(null, 'pass'));
+    });
+    const promise = Reattempt.run({ times: 2 }, resolve => fn(resolve));
+    await expect(promise).resolves.toEqual(['pass']);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   test('Reattempt.run() rejects error first callbacks', async () => {
     const fn = jest.fn(callback => {
-      setTimeout(() => callback('error'));
+      process.nextTick(() => callback('error'));
     });
     const promise = Reattempt.run({ times: 2 }, resolve => fn(resolve));
     await expect(promise).rejects.toBe('error');
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
-  test('Reattempt.run() resolves error first callbacks', async () => {
-    const fn = jest.fn(callback => {
-      setTimeout(() => callback(null, 'pass'));
+  test('Reattempt.run() resolves custom callbacks manually', async () => {
+    let passes = 3;
+    const fn = jest.fn((onSuccess, onError) => {
+      process.nextTick(() => (passes-- ? onError('error') : onSuccess('pass')));
     });
-    const promise = Reattempt.run({ times: 2 }, resolve => fn(resolve));
-    await expect(promise).resolves.toBe('pass');
-    expect(fn).toHaveBeenCalledTimes(1);
+    const promise = Reattempt.run({ times: 4 }, done => {
+      fn(done.resolve, done.reject);
+    });
+    await expect(promise).resolves.toEqual(['pass']);
+  });
+
+  test('Reattempt.run() rejects custom callbacks manually', async () => {
+    let passes = 3;
+    const fn = jest.fn((onSuccess, onError) => {
+      process.nextTick(() => (passes-- ? onError('error') : onSuccess('pass')));
+    });
+    const promise = Reattempt.run({ times: 2 }, done => {
+      fn(done.resolve, done.reject);
+    });
+    await expect(promise).rejects.toBe('error');
   });
 });

@@ -1,15 +1,21 @@
 type AsyncAttemptFunction<T> = () => Promise<T>;
 
-type CallbackAttemptFunction<T> = (
-  resolve: (error: any, value?: T) => any,
-) => any;
+interface Done<T extends any[]> {
+  (error: any, ...args: T): void;
+  resolve(...args: T): void;
+  reject(error: any): void;
+}
 
-type CallbackPromise<Callback> = Promise<
+type CallbackAttemptFunction<T> = T extends any[]
+  ? (done: Done<T>) => any
+  : never;
+
+type AttemptPromise<Callback, Value> = Promise<
   Callback extends AsyncAttemptFunction<infer T>
     ? T
-    : Callback extends CallbackAttemptFunction<infer P>
-    ? P
-    : any
+    : Value extends (...args: infer A) => any
+    ? A
+    : never
 >;
 
 export interface ReattemptOptions {
@@ -26,21 +32,21 @@ function isPromise<T>(value: any): value is Promise<T> {
   );
 }
 
-function reattemptFunction<V>(
+function runAttempt<T>(
   options: ReattemptOptions,
-  callback: AsyncAttemptFunction<V> | CallbackAttemptFunction<V>,
-): CallbackPromise<typeof callback> {
+  callback: AsyncAttemptFunction<T> | CallbackAttemptFunction<T>,
+): AttemptPromise<typeof callback, T> {
   const delay = options.delay || 0;
   let currentAttempts = options.times;
 
-  function attemptAsync<T>(
+  function attemptAsync(
     promise: Promise<T>,
     fn: AsyncAttemptFunction<T>,
     resolve: (value?: T | PromiseLike<T>) => void,
     reject: (value?: T | PromiseLike<T>) => void,
   ) {
     promise.then(resolve).catch(error => {
-      if (currentAttempts) {
+      if (currentAttempts > 0) {
         setTimeout(() => {
           currentAttempts--;
           attemptAsync(fn(), fn, resolve, reject);
@@ -52,29 +58,32 @@ function reattemptFunction<V>(
   }
 
   const callbackResolver: {
-    resolve: (args?: any[]) => void;
+    resolve: Done<T[]>;
     promise: Promise<any>;
   } = {} as any;
 
   function resetCallbackResolver() {
     callbackResolver.promise = new Promise(resolve => {
-      callbackResolver.resolve = function resolveCallback() {
-        resolve(arguments);
-      };
+      function done() {
+        resolve(Array.from(arguments));
+      }
+      done.resolve = done.bind(null, null);
+      done.reject = done.bind(null);
+      callbackResolver.resolve = done;
     });
   }
 
   resetCallbackResolver();
 
-  function attemptCallback<T>(
+  function attemptCallback(
     fn: CallbackAttemptFunction<T>,
-    resolve: (value?: T | PromiseLike<T>) => void,
-    reject: (value?: T | PromiseLike<T>) => void,
+    resolve: (value?: T) => void,
+    reject: (value?: T) => void,
   ) {
     callbackResolver.promise.then((args: any[]) => {
       if (!args[0]) {
-        return resolve(args[1]);
-      } else if (currentAttempts) {
+        return resolve(args.slice(1) as any);
+      } else if (currentAttempts > 0) {
         resetCallbackResolver();
         setTimeout(() => {
           currentAttempts--;
@@ -89,15 +98,16 @@ function reattemptFunction<V>(
 
   return new Promise((resolve, reject) => {
     currentAttempts--;
-    const value = callback(callbackResolver.resolve);
-    if (isPromise<V>(value)) {
-      callbackResolver.resolve();
-      attemptAsync(value, callback as AsyncAttemptFunction<V>, resolve, reject);
+    const value = callback(callbackResolver.resolve as any);
+    if (isPromise<T>(value)) {
+      callbackResolver.resolve(null);
+      attemptAsync(value, callback as AsyncAttemptFunction<T>, resolve, reject);
     } else {
-      attemptCallback(callback, resolve, reject);
+      attemptCallback(callback as CallbackAttemptFunction<T>, resolve, reject);
     }
   });
 }
+
 export default {
-  run: reattemptFunction,
+  run: runAttempt,
 };

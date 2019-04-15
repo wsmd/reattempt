@@ -29,6 +29,7 @@ reattempt
 - [Usage](#usage)
   - [Asynchronous Promise-Based Functions](#asynchronous-promise-based-functions)
   - [Node.js Error-First Callbacks](#nodejs-error-first-callbacks)
+  - [Custom Interface Functions](#custom-interface-functions)
   - [Working with TypeScript](#working-with-typescript)
     - [Reattempt As A Decorator](#reattempt-as-a-decorator)
     - [Type Safe Callbacks](#type-safe-callbacks)
@@ -39,6 +40,7 @@ reattempt
     - [`times: number`](#times-number)
     - [`delay?: number`](#delay-number)
   - [Reattempt Callback](#reattempt-callback)
+  - [The `done` Callback](#the-done-callback)
 
 </p>
 </details>
@@ -97,6 +99,28 @@ async function main() {
 }
 ```
 
+### Custom Interface Functions
+
+Similar to working with *[Node.js Error-First Callbacks](nodejs-error-first-callbacks)*, the `done` callback can be used to reattempt any asynchronous function with custom callback interface. For example, some APIs expects an `onSuccess` and `onError` callbacks.
+
+The properties `done.resolve` and `done.reject` can be used to hook into any custom interface and perform reattempts as needed.
+
+```ts
+function doSomething(onSuccess, onError) {
+  // some async operations
+}
+
+async function main() {
+  try {
+    const data = await Reattempt.run({ times: 3 }, done => {
+      doSomething(done.resolve, done.reject);
+    });
+  } catch (error) {
+    // an error is thrown if the function rejects with an error after
+    // exhausting all attempts
+  }
+}
+```
 
 ### Working with TypeScript
 
@@ -126,14 +150,17 @@ class Group {
 
 #### Type Safe Callbacks
 
-Reattempt can infer types of async and Promise-based functions automatically. However, when working with error-first callbacks, you can enforce type safety by providing a type argument informing Reattempt about the type of value your function could potentially return.
+Reattempt can infer types of async and Promise-based functions automatically.
+
+However, when working with error-first callbacks, you can enforce type safety by passing a type argument informing Reattempt about the list of success arguments the original function could potentially provide.
 
 ```ts
 Reattempt
-  .run<Buffer>({ times: 3 }, done => {
-    fs.readFile('./path/to/file', done);
+  .run<[string, string]>({ times: 3 }, done => {
+    childProcess.exec('cat *.md | wc -w', attempt);
   })
-  .then(value => /* value is of type Buffer */)
+  // resolves with an array of success type-safe arguments
+  .then(([stdout, stderr]) => stdout.trim())
   .catch(error => /* ... */);
 ```
 
@@ -146,7 +173,6 @@ Reattempt
 Runs and reattempt the provided callback. If the callback fails, it will be reattempted until it resolves, or until the maximum retries count `options.times` is reached, whichever comes first.
 
 Returns a `Promise` that resolves with the result of the provided function, and rejects with the same error it could reject with.
-
 
 ### Reattempt Options
 
@@ -195,6 +221,15 @@ Reattempt.run({ times: 2 }, done => {
   fs.readFile('path/to/file', 'utf-8', done);
 });
 ```
+
+### The `done` Callback
+
+If you are reattempting a non-`async` function (or a function that does not return a `Promise`), pass a callback function with one argument `done`.
+
+This argument controls the reattempt flow and can be used in one of two ways:
+
+- As an error-first callback that you can pass to any function such as most Node.js APIs
+- A hook to custom interfaces that excepts success and error callbacks by utilizing the two properties `done.resolve` and `done.reject`.
 
 # License
 

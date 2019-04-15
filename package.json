@@ -2,9 +2,10 @@
   "name": "reattempt",
   "description": "Give your functions another chance",
   "version": "0.1.0",
+  "author": "Waseem Dahman <dwaseem@icloud.com>",
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "license": "MIT",
   "keywords": [
     "try",
     "try-catch",
