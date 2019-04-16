@@ -76,9 +76,7 @@ describe('Reattempt', () => {
     const fn = jest.fn(callback => {
       process.nextTick(() => callback(null, 'pass'));
     });
-    const promise = Reattempt.run<[string]>({ times: 2 }, resolve =>
-      fn(resolve),
-    );
+    const promise = Reattempt.run<[string]>({ times: 2 }, done => fn(done));
     await expect(promise).resolves.toEqual(['pass']);
     expect(fn).toHaveBeenCalledTimes(1);
   });
@@ -87,9 +85,7 @@ describe('Reattempt', () => {
     const fn = jest.fn(callback => {
       process.nextTick(() => callback('error'));
     });
-    const promise = Reattempt.run<[string]>({ times: 2 }, resolve =>
-      fn(resolve),
-    );
+    const promise = Reattempt.run<[string]>({ times: 2 }, done => fn(done));
     await expect(promise).rejects.toBe('error');
     expect(fn).toHaveBeenCalledTimes(2);
   });
@@ -114,5 +110,81 @@ describe('Reattempt', () => {
       fn(done.resolve, done.reject);
     });
     await expect(promise).rejects.toBe('error');
+  });
+
+  describe('intercepting attempts of async functions', () => {
+    it('Reattempt.run() report async errors via onError', async () => {
+      const fn = jest.fn(() => Promise.reject('error'));
+      const handleError = jest.fn();
+      const result = Reattempt.run({ times: 3, onError: handleError }, fn);
+      await expect(result).rejects.toBe('error');
+      expect(handleError).toHaveBeenCalledWith(
+        'error', // error
+        expect.any(Function), // done
+        expect.any(Function), // abort
+      );
+      expect(handleError).toHaveBeenCalledTimes(3);
+    });
+
+    it('options.onError can abort an error of async function', async () => {
+      const fn = jest.fn(() => Promise.reject('error'));
+      const handleError = jest.fn((error, done, abort) => {
+        abort();
+      });
+      const result = Reattempt.run({ times: 3, onError: handleError }, fn);
+      await expect(result).rejects.toBe('error');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('options.onError can skip errors of async function', async () => {
+      const fn = jest.fn(() => Promise.reject('error'));
+      const handleError = jest.fn((error, done, abort) => {
+        done('test');
+      });
+      const result = Reattempt.run({ times: 3, onError: handleError }, fn);
+      await expect(result).resolves.toBe('test');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('intercepting attempts of callback functions', () => {
+    it('Reattempt.run() report callback errors via onError', async () => {
+      const fn = jest.fn(callback => process.nextTick(() => callback('error')));
+      const handleError = jest.fn();
+      const result = Reattempt.run<[]>(
+        { times: 3, onError: handleError },
+        done => fn(done),
+      );
+      await expect(result).rejects.toBe('error');
+      expect(handleError).toHaveBeenCalledWith(
+        'error', // error
+        expect.any(Function), // done
+        expect.any(Function), // abort
+      );
+      expect(handleError).toHaveBeenCalledTimes(3);
+    });
+
+    it('options.onError can abort an error', async () => {
+      const fn = jest.fn(callback => process.nextTick(() => callback('error')));
+      const handleError = jest.fn((error, done, abort) => {
+        abort();
+      });
+      const result = Reattempt.run<[]>({ times: 3, onError: handleError }, fn);
+      await expect(result).rejects.toBe('error');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('options.onError can skip errors and resolve with custom value', async () => {
+      const fn = jest.fn(callback => process.nextTick(() => callback('error')));
+      const handleError = jest.fn((error, done, abort) => {
+        done('test');
+      });
+      const result = Reattempt.run<[string]>(
+        { times: 3, onError: handleError },
+        fn,
+      );
+      await expect(result).resolves.toEqual(['test']);
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
   });
 });

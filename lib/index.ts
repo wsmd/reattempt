@@ -1,16 +1,16 @@
 type AsyncAttemptFunction<T> = () => Promise<T>;
 
-interface Done<T extends any[]> {
+interface DoneCallback<T extends any[]> {
   (error: any, ...args: T): void;
   resolve(...args: T): void;
   reject(error: any): void;
 }
 
 type CallbackAttemptFunction<T> = T extends any[]
-  ? (done: Done<T>) => any
+  ? (done: DoneCallback<T>) => any
   : never;
 
-type AttemptPromise<Callback, Value> = Promise<
+type AttemptResult<Callback, Value> = Promise<
   Callback extends AsyncAttemptFunction<infer T>
     ? T
     : Value extends (...args: infer A) => any
@@ -21,61 +21,99 @@ type AttemptPromise<Callback, Value> = Promise<
 export interface ReattemptOptions {
   times: number;
   delay?: number;
+  onError?(error: any, done: (value?: any) => void, abort: () => void): void;
+}
+
+interface Interceptor {
+  done: any;
+  abort: boolean;
+  setDone(...args: any[]): void;
+  setAbort(): void;
+  intercept(error: any): void;
+}
+
+function isFunction(value: any): value is (...args: any[]) => any {
+  return typeof value === 'function';
 }
 
 function isPromise<T>(value: any): value is Promise<T> {
-  const type = typeof value;
   return (
     value != null &&
-    (type === 'object' || type === 'function') &&
-    typeof value.then === 'function'
+    (isFunction(value) || typeof value === 'object') &&
+    isFunction(value.then)
   );
+}
+
+function createInterceptor(
+  callback: Required<ReattemptOptions>['onError'],
+): Interceptor {
+  const interceptor = {
+    abort: false,
+    setAbort() {
+      interceptor.abort = true;
+    },
+    setDone() {
+      interceptor.done = Array.from(arguments);
+    },
+    intercept(error: any) {
+      callback(error, interceptor.setDone, interceptor.setAbort);
+    },
+  } as Interceptor;
+  return interceptor;
 }
 
 function runAttempt<T>(
   options: ReattemptOptions,
   callback: AsyncAttemptFunction<T> | CallbackAttemptFunction<T>,
-): AttemptPromise<typeof callback, T> {
+): AttemptResult<typeof callback, T> {
   const delay = options.delay || 0;
   let currentAttempts = options.times;
+  const interceptor = createInterceptor(
+    isFunction(options.onError) ? options.onError : () => {},
+  );
 
-  function attemptAsync(
+  function reattemptAsync(
     promise: Promise<T>,
     fn: AsyncAttemptFunction<T>,
     resolve: (value?: T | PromiseLike<T>) => void,
     reject: (value?: T | PromiseLike<T>) => void,
   ) {
     promise.then(resolve).catch(error => {
-      if (currentAttempts > 0) {
-        setTimeout(() => {
-          currentAttempts--;
-          attemptAsync(fn(), fn, resolve, reject);
-        }, delay);
-      } else {
+      interceptor.intercept(error);
+      if (interceptor.done) {
+        return resolve.apply(null, interceptor.done);
+      }
+
+      if (interceptor.abort || currentAttempts <= 0) {
         return reject(error);
       }
+
+      setTimeout(() => {
+        currentAttempts--;
+        reattemptAsync(fn(), fn, resolve, reject);
+      }, delay);
     });
   }
 
   const callbackResolver: {
-    resolve: Done<T[]>;
+    resolve: DoneCallback<T[]>;
     promise: Promise<any>;
   } = {} as any;
 
   function resetCallbackResolver() {
     callbackResolver.promise = new Promise(resolve => {
-      function done() {
+      function resolveCallback() {
         resolve(Array.from(arguments));
       }
-      done.resolve = done.bind(null, null);
-      done.reject = done.bind(null);
-      callbackResolver.resolve = done;
+      resolveCallback.resolve = resolveCallback.bind(null, null);
+      resolveCallback.reject = resolveCallback.bind(null);
+      callbackResolver.resolve = resolveCallback;
     });
   }
 
   resetCallbackResolver();
 
-  function attemptCallback(
+  function reattemptCallback(
     fn: CallbackAttemptFunction<T>,
     resolve: (value?: T) => void,
     reject: (value?: T) => void,
@@ -83,16 +121,24 @@ function runAttempt<T>(
     callbackResolver.promise.then((args: any[]) => {
       if (!args[0]) {
         return resolve(args.slice(1) as any);
-      } else if (currentAttempts > 0) {
-        resetCallbackResolver();
-        setTimeout(() => {
-          currentAttempts--;
-          fn(callbackResolver.resolve);
-          attemptCallback(fn, resolve, reject);
-        }, delay);
-      } else {
-        reject(args[0]);
       }
+
+      interceptor.intercept(args[0]);
+
+      if (interceptor.done) {
+        return resolve(interceptor.done as any);
+      }
+
+      if (interceptor.abort || currentAttempts <= 0) {
+        return reject(args[0]);
+      }
+
+      resetCallbackResolver();
+      setTimeout(() => {
+        currentAttempts--;
+        fn(callbackResolver.resolve);
+        reattemptCallback(fn, resolve, reject);
+      }, delay);
     });
   }
 
@@ -101,9 +147,18 @@ function runAttempt<T>(
     const value = callback(callbackResolver.resolve as any);
     if (isPromise<T>(value)) {
       callbackResolver.resolve(null);
-      attemptAsync(value, callback as AsyncAttemptFunction<T>, resolve, reject);
+      reattemptAsync(
+        value,
+        callback as AsyncAttemptFunction<T>,
+        resolve,
+        reject,
+      );
     } else {
-      attemptCallback(callback as CallbackAttemptFunction<T>, resolve, reject);
+      reattemptCallback(
+        callback as CallbackAttemptFunction<T>,
+        resolve,
+        reject,
+      );
     }
   });
 }

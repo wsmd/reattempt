@@ -2,6 +2,7 @@
 <img width="144" src="https://user-images.githubusercontent.com/2100222/56097756-9520c880-5ec6-11e9-9e77-9a2b5339fbf8.png">
 
 reattempt
+
 </h1>
 
 <p align="center">
@@ -30,6 +31,7 @@ reattempt
   - [Asynchronous Promise-Based Functions](#asynchronous-promise-based-functions)
   - [Node.js Error-First Callbacks](#nodejs-error-first-callbacks)
   - [Custom Interface Functions](#custom-interface-functions)
+  - [Intercepting Attempts](#intercepting-attempts)
   - [Working with TypeScript](#working-with-typescript)
     - [Reattempt As A Decorator](#reattempt-as-a-decorator)
     - [Type Safe Callbacks](#type-safe-callbacks)
@@ -39,6 +41,7 @@ reattempt
   - [Reattempt Options](#reattempt-options)
     - [`times: number`](#times-number)
     - [`delay?: number`](#delay-number)
+    - [`onError?(error, done, abort): void`](#onerrorerror-done-abort-void)
   - [Reattempt Callback](#reattempt-callback)
   - [The `done` Callback](#the-done-callback)
 
@@ -65,7 +68,7 @@ import Reattempt from 'reattempt';
 async function doSomethingAsync() {
   // doing async operation that may throw
   return result;
-};
+}
 
 async function main() {
   try {
@@ -101,7 +104,7 @@ async function main() {
 
 ### Custom Interface Functions
 
-Similar to working with *[Node.js Error-First Callbacks](#nodejs-error-first-callbacks)*, the `done` callback can be used to reattempt any asynchronous function with custom callback interface. For example, some APIs expects an `onSuccess` and `onError` callbacks.
+Similar to working with _[Node.js Error-First Callbacks](#nodejs-error-first-callbacks)_, the `done` callback can be used to reattempt any asynchronous function with custom callback interface. For example, some APIs expects an `onSuccess` and `onError` callbacks.
 
 The properties `done.resolve` and `done.reject` can be used to hook into any custom interface and perform reattempts as needed.
 
@@ -118,6 +121,42 @@ async function main() {
   } catch (error) {
     // an error is thrown if the function rejects with an error after
     // exhausting all attempts
+  }
+}
+```
+
+### Intercepting Attempts
+
+There are cases when you need to intercept an attempt call. It's possible to control the reattempt flow, by providing the `onError` option. This option allows you to intercept each attempt and control the reattempt flow.
+
+<!-- prettier-ignore -->
+```js
+import Reattempt from 'reattempt';
+
+async function doSomething() {
+  // some async operations
+}
+
+function handleError(
+  error /* the error object that the function rejected with */,
+  done  /* resolves the function call with a custom value */,
+  abort /* bail out of remaining attempts and rejects with current error */,
+) {
+  if (shouldAbortRemainingAttempts) {
+    abort();
+  } else if (shouldSkipAttemptsAndResolve) {
+    done(defaultValue);
+  }
+}
+
+async function main() {
+  try {
+    const result = await Reattempt.try(
+      { times: 10, onError: handleError },
+      doSomething,
+    );
+  } catch (error) {
+    // ...
   }
 }
 ```
@@ -189,6 +228,14 @@ If this property is not provided Reattempt will perform the provided function on
 The duration in milliseconds between each attempt. Defaults to `0`.
 
 If this property is not provided Reattempt will perform a reattempt as soon as the function fails.
+
+#### `onError?(error, done, abort): void`
+
+A callback that fires on each attempt after receiving an error. It allows you to intercept an attempt and gives you access to the error object. It passes the following parameters:
+
+- `error: any`: the error that the function rejected with
+- `done(value: any): void`: a function that allows you to skip remaining reattempts and resolve the attempted function with the value provided.
+- `abort(): void`: a function allowing you to bail out of remaining attempts and rejects the attempted function immediately.
 
 ### Reattempt Callback
 

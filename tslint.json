@@ -7,7 +7,8 @@
     "quotemark": false,
     "arrow-parens": false,
     "unified-signatures": false,
-    "no-console": false
+    "no-console": false,
+    "no-empty": false
   },
   "rulesDirectory": []
 }
