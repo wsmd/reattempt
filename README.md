@@ -20,12 +20,13 @@ reattempt
   </a>
 </p>
 
-> `reattempt` is a modern JavaScript library for the browser and Node.js that lets you retry asynchronous functions when they fail because some functions deserve a second chance, or a third or maybe even several dozen or so.
+> `reattempt` is a modern JavaScript library for the browser and Node.js that lets you retry asynchronous functions when they fail - because some functions deserve a second chance, or a third or maybe even several dozen or so.
 
 <details>
 <summary>📖 Table of Contents</summary>
 <p>
 
+- [Highlights](#highlights)
 - [Getting Started](#getting-started)
 - [Usage](#usage)
   - [Asynchronous Promise-Based Functions](#asynchronous-promise-based-functions)
@@ -47,6 +48,14 @@ reattempt
 
 </p>
 </details>
+
+## Highlights
+
+- 🚀 Very lightweight: ~550 bytes minified+gzipped
+- ⚡️ Modern asynchronous JavaScript support with Promises and Async/Await
+- 💪 Flexible API that covers many cases
+- 🛠 Targeted for both the browser and Node.js
+- ⛑ Type-safety with TypeScript and a built-in decorator
 
 ## Getting Started
 
@@ -151,7 +160,7 @@ function handleError(
 
 async function main() {
   try {
-    const result = await Reattempt.try(
+    const result = await Reattempt.run(
       { times: 10, onError: handleError },
       doSomething,
     );
