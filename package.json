@@ -1,7 +1,7 @@
 {
   "name": "reattempt",
   "description": "Give your functions another chance",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Waseem Dahman <dwaseem@icloud.com>",
   "license": "MIT",
   "main": "dist/index.js",
